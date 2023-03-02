@@ -7,7 +7,7 @@ from random import random, randint
 
 NPROD = 5   
 N = 10
-k = 2
+k = 2  # el tamaño de los buffer, menor que le numero de elementos producidos
 
 def delay(factor = 10):
     sleep(random()/factor)
