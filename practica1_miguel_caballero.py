@@ -1,7 +1,7 @@
 from multiprocessing import Process
 from multiprocessing import Semaphore
 from multiprocessing import current_process
-from multiprocessing import Value, Array
+from multiprocessing import Value, Manager
 from time import sleep
 from random import random, randint
 
@@ -45,15 +45,13 @@ def obtener_minimo(lista_numeros):  #devuelve el minimo valor mayor que 0 y su p
 
 def consumidor(semaforos_vac, semaforos_llen, lista_numeros, array_salida):
     terminado = False
-    k=0
     for s in semaforos_vac:  #Espera a que todos los productores hayan producido el primer numero
         s.acquire()
     while not terminado:
         pos, val, terminado=obtener_minimo(lista_numeros)
         if not terminado:
-            array_salida[k]=val
+            array_salida.append(val)
             print ("ordenando...")
-            k+=1
             semaforos_llen[pos].release()
             semaforos_vac[pos].acquire()
             delay()
@@ -71,7 +69,7 @@ def main():
                         args=(semaforos_vac[i], storage[i], semaforos_llen[i]))
                 for i in range(NPROD) ]
 
-    salida = Array('i', N*NPROD)
+    salida = Manager().list()
 
     proc_cons = Process(target=consumidor,
                         name='consumidor',
