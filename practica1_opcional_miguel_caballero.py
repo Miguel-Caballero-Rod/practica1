@@ -7,19 +7,22 @@ from random import random, randint
 
 NPROD = 5   
 N = 10
+k = 2
 
 def delay(factor = 10):
     sleep(random()/factor)
 
-def produce_num(storage, pos):
+def produce_num(storage, pos, sem):
     if pos == 0:
-        storage[0] = randint(1,10)
+        num = randint(1,10)
     else:
-        storage[pos] = storage[pos-1]+randint(1,10)
+        num = storage[(pos-1)%len(storage)]+randint(1,10)
+    sem.acquire()
+    storage[pos%len(storage)]=num
 
-def producer(sem, storage):   # sem cap 1 y full cap NPROD
+def producer(sem, storage, sem_cap):   # sem cap 1 y full cap NPROD
     for i in range(N):
-        produce_num(storage, i)
+        produce_num(storage, i, sem_cap)
         print (f"{current_process().name} produciendo...")
         sem.release()  #hace release tantas veces como numeros producidos, por lo que 
                         #el consumidor siempre puede acceder a la componente "#releases"
@@ -30,8 +33,8 @@ def producer(sem, storage):   # sem cap 1 y full cap NPROD
 def obtener_minimo(listas_numeros, listas_pos):
     lista_elementos_validos=[]
     for i, val in enumerate(listas_pos):
-        if val.value < len(listas_numeros[i]):  # en otro caso ya se ha ordenado entero este array
-            lista_elementos_validos.append((listas_numeros[i][val.value],i))
+        if val.value < N:  # en otro caso ya se ha ordenado entero este array
+            lista_elementos_validos.append((listas_numeros[i][val.value%len(listas_numeros[i])],i))
     if len(lista_elementos_validos)!=0:
         val,pos=min(lista_elementos_validos)
         terminado=False
@@ -40,7 +43,7 @@ def obtener_minimo(listas_numeros, listas_pos):
         terminado=True
     return val,pos,terminado
 
-def consumidor(semaforos_vac, listas_numeros, listas_pos, array_salida):
+def consumidor(semaforos_vac, listas_numeros, listas_pos, sem_cap, array_salida):
     terminado = False
     for s in semaforos_vac:
         s.acquire()
@@ -50,6 +53,7 @@ def consumidor(semaforos_vac, listas_numeros, listas_pos, array_salida):
             listas_pos[pos].value += 1
             print ("ordenando...")
             array_salida.append(val)
+            sem_cap[pos].release()
             semaforos_vac[pos].acquire()
             delay()
 
@@ -60,18 +64,24 @@ def main():
 
     semaforos_vac = [Semaphore(0) for i in range(NPROD)]
     
-    storages = [Array('i', N) for i in range(NPROD)]
+    storages = [Array('i', k) for i in range(NPROD)]
+    
+    capacidades = Array('i', NPROD)
+    for i,a in enumerate(storages):
+        capacidades[i] = len(a)
+
+    sem_capacidad = [Semaphore(i) for i in capacidades]
 
     prodlst = [ Process(target=producer,
                         name=f'productor_{i}',
-                        args=(semaforos_vac[i], storages[i]))
+                        args=(semaforos_vac[i], storages[i], sem_capacidad[i]))
                 for i in range(NPROD) ]
 
     salida = Manager().list()
 
     proc_cons = Process(target=consumidor,
                         name='consumidor',
-                        args=(semaforos_vac, storages, lista_pos, salida))
+                        args=(semaforos_vac, storages, lista_pos, sem_capacidad, salida))
     
     print('inicializando productores...')
     
